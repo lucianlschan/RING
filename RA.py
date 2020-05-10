@@ -189,7 +189,7 @@ def GetRingElement(mol, idxlist):
     
     mol: rdMol
 
-    idx: list (all int)
+    idxlist: list (all int)
 
     Return:
 
@@ -197,6 +197,59 @@ def GetRingElement(mol, idxlist):
     """
     atoms = [(node, mol.GetAtomWithIdx(node).GetAtomicNum()) for node in idxlist]
     return atoms
+
+
+def GetRingBonds(mol, rp):
+    """
+    Input:
+
+    mol: rdmol
+
+    rp: ringpath (list)
+
+    Return:
+
+    bonds: list
+    """
+    N = len(rp)
+    bondsorder = [float(mol.GetBondBetweenAtoms(rp[i], rp[(i+1)%N]).GetBondType()) for i in range(N)]
+    bondorder_modified = [1.5 if b==12 else b for b in bondsorder]
+    bondatom = [tuple(sorted([rp[i],rp[(i+1)%N]])) for i in range(N)]
+    bonds = list(zip(bondatom,bondorder_modified))
+    return bonds
+
+
+def CompareConnectivity(orderlist, ringsize, cscore):
+    """
+    Return
+
+    pos_order: list
+    """
+    k = int(ringsize/2+1) if ringsize%2==0 else int((ringsize+1)/2)
+    csidx = [x[0] for x in cscore]
+    orderframe = pd.DataFrame(orderlist)
+    fullscore = []
+    for i in orderlist:
+        tmp = []
+        for j in i:
+            if j not in csidx:
+                tmp.append(0.0)
+            else:
+                tmp.append(cscore[csidx.index(j)][1])
+        fullscore.append(tmp)
+    scoreframe = pd.DataFrame(fullscore).cumsum(axis=1).iloc[:,:k]
+    maximum = max(scoreframe[k-1])
+    seleorder = orderframe[scoreframe[k-1]==maximum]
+    selescore = scoreframe[scoreframe[k-1]==maximum]
+    if len(seleorder)>1:
+        for i in range(1,k-1):
+            colmax = max(selescore[i])
+            neworder = seleorder[selescore[i]==colmax]
+            newscore = selescore[selescore[i]==colmax]
+            seleorder = neworder
+            selescore = newscore
+    pos_order = seleorder.values.tolist()
+    return pos_order
 
 def CompareElementSum(orderlist, ringsize, elements):
     """
@@ -238,51 +291,69 @@ def CompareElementSum(orderlist, ringsize, elements):
     return pos_order
 
 
-def GetRingBonds(mol, rp):
+
+def OrderByConnectivity(idxlist, ringsize, connectivity):
     """
     Input:
 
-    mol: rdmol
+    idxlist:
 
-    rp: ringpath (list)
+    connectivity:
 
     Return:
+
+    pos_order: list
+
+    """
+    k = int(ringsize/2+1) if ringsize%2==0 else int((ringsize+1)/2)
+
+    pos_order = []
+    return pos_order
+
+#################################
+#### Ring Atom Rearrangement ####
+#################################
+def EnumerateAtomOrders(idxlist, ringsize, init_index):
+    """
+    Eumerate all possible ring path (including clockwise, anticlockwise)
+
+    Return:
+
+    allorder: list of lists
+    """
+    allorder = []
+    idxarr = np.array(idxlist)
+    for i in init_index:
+        clock = np.mod(list(range(i,i+ringsize)),ringsize)
+        anti = np.mod(list(range(i+1,i+1-ringsize,-1)),ringsize)
+        clockorder = idxarr[clock]
+        antiorder = idxarr[anti]
+        allorder.append(clockorder.tolist())
+        allorder.append(antiorder.tolist())
+    return allorder
+
+def GetNeighbours(mol, idx):
+    """
+    Get Atom Neighbours.
+    
+    Input:
+
+    mol: rdMol
+
+    idx: Int
+
+    Return:
+
+    atomidx: list
 
     bonds: list
     """
-    N = len(rp)
-    bonds_ = [int(mol.GetBondBetweenAtoms(rp[i], rp[(i+1)%N]).GetBondType()) for i in range(N)]
-    bonds = [1.5 if b==12 else b for b in bonds_]
-    return bonds
+    connected_atoms = mol.GetAtomWithIdx(idx).GetNeighbors()
+    atomidx = [atom.GetIdx() for atom in connected_atoms]
+    atomnicno = [atom.GetAtomicNum() for atom in connected_atoms]
+    bonds = [int(mol.GetBondBetweenAtoms(idx,x).GetBondType()) for x in atomidx]
+    return atomidx, bonds
 
-def CompareBondSum(orderlist, ringsize, bonds):
-    """
-    Return:
-
-    pos_order: list of lists [order1, order2, ..., order n]
-    """
-    k = int(ringsize/2+1) if ringsize%2==0 else int((ringsize+1)/2)
-    bonddict = dict(bonds)
-    fullb = []
-    tmp = []
-    for i in orderlist:
-        tmp.append([tuple(sorted([i[x%ringsize],i[(x+1)%ringsize]])) for x in range(ringsize)])
-    for i in tmp:
-        fullb.append([bonddict.get(j) for j in i])
-    fullbsum = pd.DataFrame(fullb).cumsum(axis=1).iloc[:,:k]
-    fullorder = pd.DataFrame(orderlist)
-    maximum = max(fullbsum[k-1])
-    seleorder = fullorder[fullbsum[k-1]==maximum]
-    selebsum = fullbsum[fullbsum[k-1]==maximum]
-    if len(seleorder)>1:
-        for i in range(1,k-1):
-            colmax = max(selebsum[i])
-            neworder = seleorder[selebsum[i]==colmax]
-            newbsum = selebsum[selebsum[i]==colmax]
-            seleorder = neworder
-            selebsum = newbsum
-    pos_order = seleorder.values.tolist()
-    return pos_order
 def GetExocyclicConnectivity(mol,idxlist):
     """
     Input: 
@@ -306,10 +377,8 @@ def GetExocyclicConnectivity(mol,idxlist):
     connectivity = list(zip(atomidx,bonds))
     return connectivity
 
-
 def ComputeConnectivityScore(mol, idxlist):
     """
-
     Input:
 
     connectivity: list of tuples
@@ -333,112 +402,49 @@ def ComputeConnectivityScore(mol, idxlist):
         groupname = list(grouped.groups.keys())
         for k in groupname:
             arr = grouped.get_group(k)["Bond"]
-            if max(arr.index)==2:
+            if arr.max()==2:
                 cscore.append((k,2.0))
-            elif max(arr.index)==1 and len(arr)==2:
+            elif arr.max()==1 and len(arr)==2:
                 cscore.append((k,1.5))
-            elif max(arr.index)==1 and len(arr)==1:
+            elif arr.max()==1.0 and len(arr)==1:
                 cscore.append((k,1.0))
             else:
-                break
-    return cscore
+                continue
+    contained = [item[0] for item in cscore]
+    fscore = cscore + [(k,0.0) for k in idxlist if k not in contained]
+    return fscore
 
-
-def CompareConnectivity(orderlist, ringsize, cscore):
+def Sorting(data,size):
     """
-    Return
-
-    pos_order: list
-    """
-    k = int(ringsize/2+1) if ringsize%2==0 else int((ringsize+1)/2)
-    csidx = [x[0] for x in cscore]
-    orderframe = pd.DataFrame(orderlist)
-    fullscore = []
-    for i in orderlist:
-        tmp = []
-        for j in i:
-            if j not in csidx:
-                tmp.append(0.0)
-            else:
-                tmp.append(cscore[csidx.index(j)][1])
-        fullscore.append(tmp)
-    scoreframe = pd.DataFrame(fullscore).cumsum(axis=1).iloc[:,:k]
-    maximum = max(scoreframe[k-1])
-    seleorder = orderframe[scoreframe[k-1]==maximum]
-    selescore = scoreframe[scoreframe[k-1]==maximum]
-    if len(seleorder)>1:
-        for i in range(1,k-1):
-            colmax = max(selescore[i])
-            neworder = seleorder[selescore[i]==colmax]
-            newscore = selescore[selescore[i]==colmax]
-            seleorder = neworder
-            selescore = newscore
-    pos_order = seleorder.values.tolist()
-    return pos_order
-
-
-
-def OrderByConnectivity(idxlist, ringsize, connectivity):
-    """
-    Input:
-
-    idxlist:
-
-    connectivity:
-
-    Return:
-
-    pos_order: list
 
     """
-    k = int(ringsize/2+1) if ringsize%2==0 else int((ringsize+1)/2)
-
-    pos_order = []
-    return pos_order
-
-def EnumerateAtomOrders(idxlist, ringsize, init_index):
-    """
-    Eumerate
-
-    Return:
-
-    all_order: list of lists
-    """
-    all_order = []
-    idxarr = np.array(idxlist)
-    for i in init_index:
-        clock = np.mod(list(range(i,i+ringsize)),ringsize)
-        anti = np.mod(list(range(i+1,i+1-ringsize,-1)),ringsize)
-        clockorder = idxarr[clock]
-        antiorder = idxarr[anti]
-        all_order.append(clockorder.tolist())
-        all_order.append(antiorder.tolist())
-    return all_order
-
-#################################
-#### Ring Atom Rearrangement ####
-#################################
-def GetNeighbours(mol, idx):
-    """
-    Get Atom Neighbours.
-    
-    Input:
-
-    mol: rdMol
-
-    idx: Int
-
-    Return:
-
-    atomidx: list
-
-    bonds: list
-    """
-    connected_atoms = mol.GetAtomWithIdx(idx).GetNeighbors()
-    atomidx = [atom.GetIdx() for atom in connected_atoms]
-    atomnicno = [atom.GetAtomicNum() for atom in connected_atoms]
-    bonds = [int(mol.GetBondBetweenAtoms(idx,x).GetBondType()) for x in atomidx]
-    return atomidx, bonds
+    midpoint = int(size/2+1) if size%2==0 else int((size+1)/2)
+    bonds = data.iloc[:,:midpoint]
+    bmax = max(bonds.iloc[:,midpoint-1])
+    seleb= data[data.iloc[:,midpoint-1]==bmax]
+    selebc = seleb
+    for i in range(1,midpoint-1):
+        colmax = max(seleb.iloc[:,i])
+        neworder = seleb[seleb.iloc[:,i]==colmax]
+        seleb = neworder
+    cframe = data.iloc[seleb.index,size:size+midpoint]
+    cmax = max(cframe.iloc[:,midpoint-1])
+    selec = cframe[cframe.iloc[:,midpoint-1]==cmax]
+    selecc = selec
+    for i in range(1,midpoint-1):
+        colmax = max(selec.iloc[:,i])
+        neworder = selec[selec.iloc[:,i]==colmax]
+        selec = neworder
+    eframe = data.iloc[selec.index, 2*size:2*size+midpoint]
+    emax = max(eframe.iloc[:,midpoint-1])
+    selee = eframe[eframe.iloc[:,midpoint-1]==emax]
+    seleec = selee
+    for i in range(1,midpoint-1):
+        colmax = max(selee.iloc[:,i])
+        neworder = selee[selee.iloc[:,i]==colmax]
+        selee = neworder
+    idx = selee.index
+    return idx
 
 def Rearrangement(mol, idxlist, order="default"):
     """
@@ -470,92 +476,36 @@ def Rearrangement(mol, idxlist, order="default"):
     if order=="random":
         output = ringloop
     if order=="default":
-        # starting atom: triple bond >  double bond > aromatic bond > single bond 
+        # starting atom: triple bond > double bond > aromatic bond > single bond 
+        # If tie exist, then consider the exocyclic connectivity of atoms (Descending Order). 
+        # Start with highest connectivity (number bonds linking to non-Hydrogen)
+        # Excoyclic connectivity order (double bond substituents) > 2 single bonds substituents > 1 single bond substituents > unsubstituted
         # If tie: we consider the element orders (Ascending Order), i.e. B>C>N>O>P>S
-        # If tie still exist, then consider the exocyclic connectivity of atoms (Descending Order). Start with highest connectivity (number bonds linking to non-Hydrogen)
-        # Excoyclic connectivity order (double bond substituents > 2 single bonds substituents > 1 single bond substituents > unsubstituted)
         # If tie still exist, then pick it at random (as it is possibly highly symmetric). E.g. cycloalkane.
         # Orientation: clockwise/anticlockwise (pick the next atoms with highest order as stated above)
         # If Ties happen, randomly pick the starting atoms and orientation.
-        # compute half loop length
-        k = int(ringsize/2+1) if ringsize%2==0 else int((ringsize+1)/2) 
-        # Rbond order
         Rbonds = GetRingBonds(mol, ringloop)
-        print(Rbonds)
-        Rbonds_ = [1.5 if x==12 else x for x in Rbonds]
-        rbondarray = np.array(Rbonds_)
-        maxbond = max(Rbonds_)
-        Relements = GetRingElement(mol,ringloop)
-        relementarray = pd.DataFrame(Relements)[1].values
-        connectivity = ComputeConnectivityScore(mol, ringloop)
-        rconnectivity = np.array(connectivity)
-        finalorder = []
-        # Determine the ring ordering
-        if maxbond==3.0: # Triple bond exist in Ring (usually in big cycles)
-            init_indx = [x for y in np.argwhere(rbondarray==maxbond).tolist() for x in y]
-            bondall = EnumerateAtomOrders(ringloop, ringsize, init_indx)
-            bond_pos_order = CompareBondSum(bondall, ringsize, Rbonds)
-            if len(bond_pos_order)>1: # Tie --> use element order next
-                ele_pos_order = CompareElementSum(bond_pos_order, ringsize, Relements)
-                if len(ele_pos_order)>1: # Tie again --> use connectivity order next
-                    c_pos_order = CompareConnectivity(orderlist, ringsize, connectivity)
-                    finalorder = c_pos_order[0] # pick the first output   <---- we terminate here, even c_pos_order could have more than one route
-                else:
-                    finalorder = ele_pos_order[0]
-            else:
-                finalorder = bond_pos_order[0]
-        elif maxbond==2.0: # Double bond exist in Ring (highest order)
-            init_indx = [x for y in np.argwhere(rbondarray==maxbond).tolist() for x in y]
-            bondall = EnumerateAtomOrders(ringloop, ringsize, init_indx)
-            bond_pos_order = CompareBondSum(bondall, ringsize, Rbonds)
-            if len(bond_pos_order)>1: # Tie --> use element order next
-                ele_pos_order = CompareElementSum(bond_pos_order, ringsize, Relements)
-                if len(ele_pos_order)>1: # Tie again --> use connectivity order next
-                    c_pos_order = CompareConnectivity(ele_pos_order, ringsize, connectivity)
-                    finalorder = c_pos_order[0] # pick the first output   <---- we terminate here, even c_pos_order could have more than one route
-                else:
-                    finalorder = ele_pos_order[0]
-            else:
-                finalorder = bond_pos_order[0]
-        elif maxbond==1.5: # Aromatic bond exist in Ring (highest order)
-            init_indx = [x for y in np.argwhere(rbondarray==maxbond).tolist() for x in y]
-            bondall = EnumerateAtomOrders(ringloop, ringsize, init_indx)
-            bond_pos_order = CompareBondSum(bondall, ringsize, Rbonds)
-            if len(bond_pos_order)>1: # Tie --> use element order next
-                ele_pos_order = CompareElementSum(bond_pos_order, ringsize, Relements)
-                if len(ele_pos_order)>1: # Tie again --> use connectivity order next
-                    c_pos_order = CompareConnectivity(ele_pos_order, ringsize, connectivity)
-                    finalorder = c_pos_order[0] # pick the first output   <---- we terminate here, even c_pos_order could have more than one route
-                else:
-                    finalorder = ele_pos_order[0]
-            else:
-                finalorder = bond_pos_order[0]
-        else: # SINGLE BOND
-            finalorder = []
-            minele = min(relementarray) # MINIMUM ATOMIC NUMBER
-            if len(rconnectivity)==0:
-                rconnectivity = np.array([0.0]*len(ringloop))
-            maxscore = np.max(rconnectivity) # MAXIMUM CONNECTIVITY 
-            # Case 1: Homocycle (cycle with same elements)
-            if np.all(relementarray==minele) & np.all(rconnectivity==maxscore): # Homocycle and all having the same connectivity
-                finalorder = ringloop # use initial atom order
-            elif np.all(relementarray==minele) & np.any(rconnectivity!=maxscore): # Homocycle with different connectivity    
-               init_indx = [x for y in np.argwhere(rconnectivity==maxscore).tolist() for x in y]
-               c_all = EnumerateAtomOrders(ringloop, ringsize, init_indx)
-               c_pos_order = CompareConnectivity(c_all, ringsize, connectivity)
-               finalorder = c_pos_order[0]  # pick the first output  <--- we terminate here, even c_pos_order could have more than one route
-            # Case 2: Heterocycle (cycle with different elementes)
-            else:
-                init_indx = [x for y in np.argwhere(relementarray==minele).tolist() for x in y]
-                e_all = EnumerateAtomOrders(ringloop, ringsize, init_indx)
-                ele_pos_order = CompareElementSum(e_all, ringsize, Relements)
-                if len(ele_pos_order)>1: # Tie again --> use connectivity order next
-                    c_pos_order = CompareConnectivity(ele_pos_order, ringsize, connectivity)
-                    finalorder = c_pos_order[0] # pick the first output   <---- we terminate here, even c_pos_order could have more than one route
-                else:
-                    finalorder = ele_pos_order[0]
-    return finalorder
-
-
-
-
+        bondarray = np.array([b[1] for b in Rbonds])
+        bonddict = dict(Rbonds)
+        cdict = dict(ComputeConnectivityScore(mol, ringloop))
+        eledict = dict(GetRingElement(mol, ringloop))
+        maximum = max(bondarray)
+        init_indx = [i for i,j in enumerate(bondarray) if j==maximum]
+        orders = EnumerateAtomOrders(ringloop, ringsize, init_indx)
+        bondf, connectivityf, elef = [],[],[]
+        for order in orders:
+            btmp = [tuple(sorted([order[x%ringsize],order[(x+1)%ringsize]])) for x in range(ringsize)] 
+            bondf.append([bonddict.get(b) for b in btmp])
+            connectivityf.append([eledict.get(atom) for atom in order])
+            elef.append([eledict.get(atom) for atom in order])
+        cframe = pd.DataFrame(connectivityf, columns=["C{}".format(x) for x in range(ringsize)]).cumsum(axis=1)
+        eframe = pd.DataFrame(elef,columns=["E{}".format(x) for x in range(ringsize)]).cumsum(axis=1)
+        bondframe = pd.DataFrame(bondf, columns=["B{}".format(x) for x in range(ringsize)]).cumsum(axis=1)
+        dataframe = pd.concat([bondframe,cframe,eframe],axis=1)
+        index = Sorting(dataframe, ringsize)
+        if len(index)>=1:
+            output = orders[index[0]]
+        else:
+            print("Please Check")
+            output = ringloop
+    return output
