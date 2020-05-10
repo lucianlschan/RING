@@ -282,6 +282,29 @@ def CompareBondSum(orderlist, ringsize, bonds):
             selebsum = newbsum
     pos_order = seleorder.values.tolist()
     return pos_order
+def GetExocyclicConnectivity(mol,idxlist):
+    """
+    Input: 
+
+    mol: rdmol
+
+    idxlist: list of int
+
+    Return:
+
+    connectivity: list of tuples  (ring atom idx, bond type that link to substitutent)
+    """
+    atomidx = []
+    bonds = []
+    for i in idxlist:
+        connected_atoms = mol.GetAtomWithIdx(i).GetNeighbors()
+        atoms = [atom.GetIdx() for atom in connected_atoms if atom.GetIdx() not in idxlist]
+        for j in atoms:
+            atomidx.append(i)
+            bonds.append(float(mol.GetBondBetweenAtoms(i,j).GetBondType()))
+    connectivity = list(zip(atomidx,bonds))
+    return connectivity
+
 
 def ComputeConnectivityScore(mol, idxlist):
     """
