@@ -4,6 +4,7 @@
 
 import math
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 import py_rdl
 
@@ -103,7 +104,7 @@ def GetRingPuckerCoords(coordinates):
 
     N = coordinates.shape[0]  # number of atoms in the ring
     z = Displacement(coordinates)
-    if N>4 and N<=16: # In our analysis, we fit it to be smaller than 16.
+    if N>4 and N<=20: # In our analysis, we fit it to be smaller than 16.
         if (N%2 == 0): # N even
             m = range(2,int((N/2)))
             cos_component = [np.dot(z,np.cos(2*np.pi*k*np.arange(0,N)/N)) for k in m]
@@ -249,7 +250,7 @@ def GetRingBonds(mol, rp):
 
     bonds: list
     """
-    N = len(ringpath)
+    N = len(rp)
     bonds_ = [int(mol.GetBondBetweenAtoms(rp[i], rp[(i+1)%N]).GetBondType()) for i in range(N)]
     bonds = [1.5 if b==12 else b for b in bonds_]
     return bonds
@@ -465,7 +466,6 @@ def Rearrangement(mol, idxlist, order="default"):
         checklist = list(filter(lambda x: x in idxlist and x not in ringloop, atomidx))
         nextatom  = checklist[0]
         ringloop.append(nextatom)
-    return ringloop
     # Random 
     if order=="random":
         output = ringloop
