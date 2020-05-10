@@ -283,6 +283,43 @@ def CompareBondSum(orderlist, ringsize, bonds):
     pos_order = seleorder.values.tolist()
     return pos_order
 
+def ComputeConnectivityScore(mol, idxlist):
+    """
+
+    Input:
+
+    connectivity: list of tuples
+
+    Return:
+
+    cscore:  list of tuples (ring atom, connectivity score)
+
+    cscore 4 levels:
+    exocyclic double bond (2),
+    two exocyclic non-hydrogen single bond (1.5),
+    one exocycle non-hydrogen single bond (1)
+    no excocycle non-hydrogen single bond (0)
+
+    """
+    connectivity = GetExocyclicConnectivity(mol, idxlist)
+    cscore = []
+    if len(connectivity)>0:
+        dataframe = pd.DataFrame(connectivity, columns=["Idx","Bond"])
+        grouped = dataframe.groupby("Idx")
+        groupname = list(grouped.groups.keys())
+        for k in groupname:
+            arr = grouped.get_group(k)["Bond"]
+            if max(arr.index)==2:
+                cscore.append((k,2.0))
+            elif max(arr.index)==1 and len(arr)==2:
+                cscore.append((k,1.5))
+            elif max(arr.index)==1 and len(arr)==1:
+                cscore.append((k,1.0))
+            else:
+                break
+    return cscore
+
+
 def CompareConnectivity(orderlist, ringsize, cscore):
     """
     Return
