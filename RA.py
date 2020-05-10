@@ -496,7 +496,7 @@ def Rearrangement(mol, idxlist, order="default"):
         for order in orders:
             btmp = [tuple(sorted([order[x%ringsize],order[(x+1)%ringsize]])) for x in range(ringsize)] 
             bondf.append([bonddict.get(b) for b in btmp])
-            connectivityf.append([eledict.get(atom) for atom in order])
+            connectivityf.append([cdict.get(atom) for atom in order])
             elef.append([eledict.get(atom) for atom in order])
         cframe = pd.DataFrame(connectivityf, columns=["C{}".format(x) for x in range(ringsize)]).cumsum(axis=1)
         eframe = pd.DataFrame(elef,columns=["E{}".format(x) for x in range(ringsize)]).cumsum(axis=1)
