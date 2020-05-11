@@ -6,6 +6,7 @@ import math
 import numpy as np
 import pandas as pd
 from rdkit import Chem
+from rdkit.Chem import rdMolTransforms
 import py_rdl
 
 ################################
@@ -144,6 +145,15 @@ def GetTotalPuckeringAmplitude(amplitude):
 ###############################
 #### Substituents Analysis ####
 ###############################
+def GetSubstituent(mol, ring, smarts):
+    substruct = Chem.MolFromSmarts(smarts)
+    matches = mol.GetSubstructMatches(substruct)
+    ring_atom_substituent_atom = []
+    for match in matches:
+        if match[0] in ring:
+            ring_atom_substituent_atom.append(match)
+    return ring_atom_substituent_atom
+
 def GetRingSubstituentPosition(mol, ring, ring_substituent):
     """
     mol: rdMol
