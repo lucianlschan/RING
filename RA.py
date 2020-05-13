@@ -179,7 +179,7 @@ def GetRingSubstituentPosition(mol, ring, ring_substituent):
     s = S/np.linalg.norm(S)
     n = GetNormal(ring_coord_)
     alpha = np.asscalar(np.arccos(fixzero(np.dot(s,n))))
-    R = np.array(substituent_coord)[0]
+    R = np.array(substituent_coord_)[0]
     U = R - np.dot(R,n)*n
     u = U/np.linalg.norm(U)
     v = np.cross(n,u)
