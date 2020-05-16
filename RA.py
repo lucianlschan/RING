@@ -5,6 +5,7 @@
 import math
 import numpy as np
 import pandas as pd
+from sklearn.decomposition import PCA
 from rdkit import Chem
 from rdkit.Chem import rdMolTransforms
 import py_rdl
@@ -519,3 +520,31 @@ def Rearrangement(mol, idxlist, order="default"):
             print("Please Check")
             output = ringloop
     return output
+
+######################
+#### Eccentricity ####
+######################
+def GetEccentricity(mol, ring):
+    coord = [list(mol.GetConformer().GetAtomPosition(x)) for x in ring]
+    ccoord = np.array(coord)-np.array(coord).mean(axis=0)
+    pca = PCA(n_components=2)
+    projection = pca.fit_transform(ccoord)
+    b = np.ones_like(projection[:,0:1])
+    X = projection[:,0:1]
+    Y = projection[:,1:]
+    M = np.hstack([np.square(X),X*Y,np.square(Y),X,Y,b])
+    D = np.matmul(np.transpose(M),M)
+    C = np.zeros([6,6])
+    C[0,2] = 2
+    C[1,1] = -1
+    C[2,0] = 2
+    inverse = np.linalg.inv(D)
+    tmp = np.matmul(inverse,C)
+    outcome = np.linalg.eig(tmp)
+    positiveidx = [y for x in np.argwhere(outcome[0]>0.0).tolist() for y in x]
+    a2,b2 = outcome[1][:,positiveidx[0]][0],outcome[1][:,positiveidx[0]][2]
+    if np.abs(a2)>np.abs(b2):
+        eccentricity = np.sqrt(1-b2/a2)
+    else:
+        eccentricity = np.sqrt(1-a2/b2)
+    return eccentricity
