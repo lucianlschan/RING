@@ -447,12 +447,15 @@ def Sorting(data,size):
         neworder = selec[selec.iloc[:,i]==colmax]
         selec = neworder
     eframe = data.iloc[selec.index, 2*size:2*size+midpoint]
-    emax = max(eframe.iloc[:,midpoint-1])
-    selee = eframe[eframe.iloc[:,midpoint-1]==emax]
+    #emax = max(eframe.iloc[:,midpoint-1])
+    emin = min(eframe.iloc[:,midpoint-1])
+    selee = eframe[eframe.iloc[:,midpoint-1]==emin]
     seleec = selee
     for i in range(1,midpoint-1):
-        colmax = max(selee.iloc[:,i])
-        neworder = selee[selee.iloc[:,i]==colmax]
+        #colmax = max(selee.iloc[:,i])
+        colmin = min(selee.iloc[:,i])
+        #neworder = selee[selee.iloc[:,i]==colmax]
+        neworder = selee[selee.iloc[:,i]==colmin]
         selee = neworder
     idx = selee.index
     return idx
