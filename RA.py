@@ -548,3 +548,23 @@ def GetEccentricity(mol, ring):
     else:
         eccentricity = np.sqrt(1-a2/b2)
     return eccentricity
+
+#######################################
+
+order = list(range(14))
+aminoacid = ["Y","W","F","H","K","E","D","T","S","C",
+            "L","V","A","G"]
+aminoacids = [tyrosine, tryptophan, phenylalanine, histidine, lysine,
+             glutamic_acid, aspartic_acid, threonine, serine, cysteine,
+             leucine, valine, alanine, glycine]
+aadict = dict(list(zip(order,aminoacid)))
+
+def CTPOrder(mol, ring, n_res=4):
+    ringsize = len(ring)
+    aatype = [GetAminoAcid(mol, ring[i]) for i in [1,4,7,10]]
+    aaidx = [aadict.get(x) for x in aatype]
+    minidx = aaidx.index(min(aaidx))
+    shift = (n_res-minidx)%n_res
+    ringloopoidx = [(i+shift*3)%ringsize for i in range(ringsize)]
+    ringloop = [ring[x] for x in ringloopidx]
+    return ringloop
