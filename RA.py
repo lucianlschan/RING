@@ -552,22 +552,66 @@ def GetEccentricity(mol, ring):
         eccentricity = np.sqrt(1-a2/b2)
     return eccentricity
 
-#######################################
+##########################
+#### Peptide Ordering ####
+##########################
+def GetAminoAcidType(mol, CA):
+    """
+    Get the amino acid single letter code
 
-order = list(range(14))
-aminoacid = ["Y","W","F","H","K","E","D","T","S","C",
-            "L","V","A","G"]
-aminoacids = [tyrosine, tryptophan, phenylalanine, histidine, lysine,
-             glutamic_acid, aspartic_acid, threonine, serine, cysteine,
+    Input:
+
+    mol: rdMol
+
+    CA: C alpha (int)
+
+    Output:
+
+    aa: string
+    """
+    alanine = Chem.MolFromSmarts("[C;R](N)[CH3X4]")
+    aspartate = Chem.MolFromSmarts("[C;R](N)[CH2X4][CX3](=[OX1])[OH0-,OH]")
+    cysteine = Chem.MolFromSmarts("[C;R](N)[CH2X4][SX2H,SX1H0-]")
+    glutamate = Chem.MolFromSmarts("[C;R](N)[CH2X4][CH2X4][CX3](=[OX1])[OH0-,OH]")
+    glycine = Chem.MolFromSmarts("[C;R](N)[$([$([NX3H2,NX4H3+]),$([NX3H](C)(C))][CX4H2][CX3](=[OX1])[OX2H,OX1-,N])]")
+    histidine = Chem.MolFromSmarts("[C;R](N)[CH2X4][#6X3]1:[$([#7X3H+,#7X2H0+0]:[#6X3H]:[#7X3H]),$([#7X3H])]:[#6X3H]:[$([#7X3H+,#7X2H0+0]:[#6X3H]:[#7X3H]),$([#7X3H])]:[#6X3H]1")
+    leucine = Chem.MolFromSmarts("[C;R](N)[CH2X4][CHX4]([CH3X4])[CH3X4]")
+    lysine = Chem.MolFromSmarts("[C;R](N)[CH2X4][CH2X4][CH2X4][CH2X4][NX4+,NX3+0]")
+    phenylalanine = Chem.MolFromSmarts("[C;R](N)[CH2X4][cX3]1[cX3H][cX3H][cX3H][cX3H][cX3H]1")
+    serine = Chem.MolFromSmarts("[C;R](N)[CH2X4][OX2H]")
+    threonine = Chem.MolFromSmarts("[C;R](N)[CHX4]([CH3X4])[OX2H]")
+    tryptophan = Chem.MolFromSmarts("[C;R](N)[CH2X4][cX3]1[cX3H][nX3H][cX3]2[cX3H][cX3H][cX3H][cX3H][cX3]12")
+    tyrosine = Chem.MolFromSmarts("[C;R](N)[CH2X4][cX3]1[cX3H][cX3H][cX3]([OHX2,OH0X1-])[cX3H][cX3H]1")
+    valine = Chem.MolFromSmarts("[C;R](N)[CHX4]([CH3X4])[CH3X4]")
+    sidechain = [tyrosine, tryptophan, phenylalanine, histidine, lysine, glutamate, aspartate, threonine, serine, cysteine,
              leucine, valine, alanine, glycine]
-aadict = dict(list(zip(order,aminoacid)))
+    order = list(range(14))
+    aminoacid_rank = ["Y","W","F","H","K","E","D","T","S","C","L","V","A","G"]
+    aminoacid = dict(list(zip(order, aminoacid_rank)))
+    match = [mol.GetSubstructMatches(x) for x in sidechain]
+    for idx, item in enumerate(match):
+        if any(item):
+            for mat in item:
+                if CA==mat[0]:
+                    aa = aminoacid.get(idx)
+    cneighbors = [atom.GetAtomicNum()==1 for atom in mol.GetAtomWithIdx(CA).GetNeighbors()]
+    c_implicit_value = mol.GetAtomWithIdx(CA).GetImplicitValence()
+    if sum(cneighbors)==2 or c_implicit_value==2:
+        aa = "G"
+    return aa
 
 def CTPOrder(mol, ring, n_res=4):
+    """
+    Get the ring ordering of cyclic peptides
+    """
+    order = list(range(14))
+    aminoacid_rank = ["W","Y","F","K","L","H","V","E","T","D","C","S","A","G"]
+    aminoacid = dict(list(zip(aminoacid_rank, order)))
     ringsize = len(ring)
-    aatype = [GetAminoAcid(mol, ring[i]) for i in [1,4,7,10]]
-    aaidx = [aadict.get(x) for x in aatype]
-    minidx = aaidx.index(min(aaidx))
+    aatype = [GetAminoAcidType(mol, ring[i]) for i in [1,4,7,10]]
+    sorting = [aminoacid_rank.index(a) for a in aatype]
+    minidx = sorting.index(min(sorting))
     shift = (n_res-minidx)%n_res
-    ringloopoidx = [(i+shift*3)%ringsize for i in range(ringsize)]
+    ringloopidx = [(i+shift*3)%ringsize for i in range(ringsize)]
     ringloop = [ring[x] for x in ringloopidx]
     return ringloop
