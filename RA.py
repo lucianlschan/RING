@@ -613,5 +613,34 @@ def CTPOrder(mol, ring, n_res=4):
     minidx = sorting.index(min(sorting))
     shift = (n_res-minidx)%n_res
     ringloopidx = [(i+shift*3)%ringsize for i in range(ringsize)]
-    ringloop = [ring[x] for x in ringloopidx]
+    ringloop = [x for _, x in sorted(zip(ringloopidx,ring))]
     return ringloop
+
+def GetSideChainFirstAtoms(mol, CA, aminoacid):
+    alanine = Chem.MolFromSmarts("[C;R](N)[CH3X4]")
+    aspartate = Chem.MolFromSmarts("[C;R](N)[CH2X4][CX3](=[OX1])[OH0-,OH]")
+    cysteine = Chem.MolFromSmarts("[C;R](N)[CH2X4][SX2H,SX1H0-]")
+    glutamate = Chem.MolFromSmarts("[C;R](N)[CH2X4][CH2X4][CX3](=[OX1])[OH0-,OH]")
+    glycine = Chem.MolFromSmarts("[C;R](N)[$([$([NX3H2,NX4H3+]),$([NX3H](C)(C))][CX4H2][CX3](=[OX1])[OX2H,OX1-,N])]")
+    histidine = Chem.MolFromSmarts("[C;R](N)[CH2X4][#6X3]1:[$([#7X3H+,#7X2H0+0]:[#6X3H]:[#7X3H]),$([#7X3H])]:[#6X3H]:[$([#7X3H+,#7X2H0+0]:[#6X3H]:[#7X3H]),$([#7X3H])]:[#6X3H]1")
+    leucine = Chem.MolFromSmarts("[C;R](N)[CH2X4][CHX4]([CH3X4])[CH3X4]")
+    lysine = Chem.MolFromSmarts("[C;R](N)[CH2X4][CH2X4][CH2X4][CH2X4][NX4+,NX3+0]")
+    phenylalanine = Chem.MolFromSmarts("[C;R](N)[CH2X4][cX3]1[cX3H][cX3H][cX3H][cX3H][cX3H]1")
+    serine = Chem.MolFromSmarts("[C;R](N)[CH2X4][OX2H]")
+    threonine = Chem.MolFromSmarts("[C;R](N)[CHX4]([CH3X4])[OX2H]")
+    tryptophan = Chem.MolFromSmarts("[C;R](N)[CH2X4][cX3]1[cX3H][nX3H][cX3]2[cX3H][cX3H][cX3H][cX3H][cX3]12")
+    tyrosine = Chem.MolFromSmarts("[C;R](N)[CH2X4][cX3]1[cX3H][cX3H][cX3]([OHX2,OH0X1-])[cX3H][cX3H]1")
+    valine = Chem.MolFromSmarts("[C;R](N)[CHX4]([CH3X4])[CH3X4]")
+    aminoacid_list = ["W","Y","F","K","L","H","V","E","T","D","C","S","A","G"]
+    smarts = [tryptophan,tyrosine,phenylalanine,lysine,leucine,histidine,valine,glutamate,threonine,aspartate,cysteine,serine,alanine,glycine]
+    aminoacid_dict = dict(list(zip(aminoacid_list,smarts)))
+    pattern = aminoacid_dict.get(aminoacid)
+    matches = mol.GetSubstructMatches(pattern)
+    if aminoacid=="G":
+        outcome = "NA"
+    else:
+        for item in matches:
+            if item[0]==CA:
+                outcome = item[2]
+    return outcome
+    
