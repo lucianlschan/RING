@@ -301,8 +301,6 @@ def CompareElementSum(orderlist, ringsize, elements):
     pos_order = seleorder.values.tolist()
     return pos_order
 
-
-
 def OrderByConnectivity(idxlist, ringsize, connectivity):
     """
     Input:
@@ -320,6 +318,37 @@ def OrderByConnectivity(idxlist, ringsize, connectivity):
 
     pos_order = []
     return pos_order
+
+def GetRingAtomType(mol, ringidx):
+    """
+    Input:
+    
+    mol: rdMol
+    
+    ringidx: list
+    
+    Return:
+    
+    outcome: list
+    
+    """
+    ringatom = Chem.MolFromSmarts("[R]")
+    monocyclicatom = Chem.MolFromSmarts("[R1]")
+    bicyclicatom = Chem.MolFromSmarts("[R2]")
+    ringatom_match = [a for x in mol.GetSubstructMatches(ringatom) for a in x]
+    monocyclic_match = [a for x in mol.GetSubstructMatches(monocyclicatom) for a in x]
+    bicyclic_match = [a for x in mol.GetSubstructMatches(bicyclicatom) for a in x]
+    outcome = []
+    for i in ringidx:
+        if (i in ringatom_match) and (i in monocyclic_match):
+            outcome.append("M")
+        elif (i in ringatom_match) and (i in bicyclic_match):
+            outcome.append("B")
+        elif (i in ringatom_match) and (i not in monocyclic_match) and (i not in bicyclic_match):
+            outcome.append("P")
+        else:
+            outcome.append("NA")
+    return outcome
 
 #################################
 #### Ring Atom Rearrangement ####
