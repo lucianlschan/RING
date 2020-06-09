@@ -143,6 +143,38 @@ def GetTotalPuckeringAmplitude(amplitude):
     Q = np.sqrt(np.square(amplitude).sum())
     return Q
 
+def PuckeringToDisplacement(q, ang, ringsize):
+    """
+    Get displacement from puckering coordinates
+
+    Input:
+
+    q: list
+
+    ang: list
+
+    ringsize: int
+
+    Output:
+
+    displacement: list
+    """
+    displacement = []
+    if (ringsize%2==0):
+        t = int(ringsize/2 -1)
+        for s in range(ringsize):
+            coscomponent = np.cos([ang[m-2]+2*np.pi*m*s/ringsize for m in range(2,t+1)])
+            qm = q[:-1]
+            displacement.append(np.sqrt(2/ringsize)*np.dot(qm,coscomponent) + np.sqrt(1/ringsize)*np.array(q[-1])*(-1)**(s))
+    else:
+        t = int((ringsize-1)/2)
+        for s in range(ringsize):
+            coscomponent = np.cos([ang[m-2]+2*np.pi*m*s/ringsize for m in range(2,t+1)])
+            displacement.append(np.sqrt(2/ringsize)*np.dot(q,coscomponent))
+    return displacement
+
+
+
 ###############################
 #### Substituents Analysis ####
 ###############################
