@@ -1,7 +1,7 @@
 ############################
 #### Ring Analysis (RA) ####
 ############################
-
+import itertools
 import math
 import numpy as np
 import pandas as pd
@@ -705,3 +705,75 @@ def GetSideChainFirstAtoms(mol, CA, aminoacid):
                 outcome = item[2]
     return outcome
     
+
+#################
+####  Other  ####
+#################
+def EnumerateRingBond(mol, idxlist):
+    """
+    Enumerate bonds in a cycle
+
+    Input:
+
+    mol: rdMol
+
+    idxlist: list (ring atoms)
+
+    Return:
+
+    ringbond: list of tuples [(atom_1, atom_2)]
+    
+    """
+    ringbond = []
+    size = len(idxlist)
+    ringbond = [(idxlist[i%size],idxlist[(i+1)%size]) for i in range(size)]
+    return ringbond
+
+def GetBridgeRing(mol):
+    """
+    Identify single bond shared by multiple ring systems
+
+    Return:
+
+    """
+    edgelist = []
+    for bond in mol.GetBonds():
+        edgelist.append((bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()))
+    data = py_rdl.Calculator.get_calculated_result(edgelist)
+    rings = []
+    for urf in data.urfs:
+        rcs = data.get_relevant_cycles_for_urf(urf)
+        for rc in rcs:
+            rcs = data.get_relevant_cycles_for_urf(urf)
+            ringatoms = Rearrangement(mol,list(rc.nodes))
+            rings.append([str(rc.urf),ringatoms])
+    NumRCs = len(rings)
+    # identify the atoms/single bonds that share in fused ring
+    bridgehead_atoms = []
+    bridgerings = []
+    bridgehead_set = list(set(bridgehead_atoms))
+    # Check for Fused Ring/Bridge Ring Atoms
+    for i in itertools.combinations(range(NumRCs),2):
+        if rings[i[0]][0]!=rings[i[1]][0]:  # only consider unpaired URFs
+            bondsetA = EnumerateRingBond(mol,rings[i[0]][1])
+            bondsetB = EnumerateRingBond(mol,rings[i[1]][1])
+            sorted_bondsetA = [tuple(sorted(ebond)) for ebond in bondsetA]
+            sorted_bondsetB = [tuple(sorted(ebond)) for ebond in bondsetB]
+            intersections = list(set(sorted_bondsetA).intersection(sorted_bondsetB))
+            intersectionelement = [x for bondpair in intersections for x in bondpair]
+            if any(intersections):
+                if len(intersections)>1:
+                    bridgerings.append(rings[i[0]][1])
+                    bridgerings.append(rings[i[1]][1])
+                    bridgering_element = list(set(intersectionelement))
+                    for node in bridgering_element:
+                        if intersectionelement.count(node)==1:
+                            bridgehead_atoms.append(node)
+            ringsintersection = list(set(rings[i[0]][1]).intersection(set(rings[i[1]][1])))
+    bridgehead_set = list(set(bridgehead_atoms))
+    bridgehead_rings = []
+    for i in bridgerings:
+        if i not in bridgehead_rings:
+            bridgehead_rings.append(i)
+    return bridgehead_rings
+
